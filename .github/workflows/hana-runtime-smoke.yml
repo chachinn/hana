@@ -13,6 +13,7 @@ on:
       - recovery-safety.js
       - skincare-step-sync.js
       - list-scroll-memory.js
+      - list-reorder.js
       - service-worker.js
       - .github/workflows/hana-runtime-smoke.yml
   workflow_dispatch:
@@ -34,6 +35,7 @@ jobs:
           node --check recovery-safety.js
           node --check skincare-step-sync.js
           node --check list-scroll-memory.js
+          node --check list-reorder.js
           node --check service-worker.js
           grep -q 'const HANA_APP_VERSION = "1.0.0"' app.js
           grep -q 'const HANA_DISPLAY_VERSION = "1"' app.js
@@ -46,9 +48,13 @@ jobs:
           grep -q 'intelligence.css?v=1.0.0' index.html
           grep -q 'skincare-step-sync.js?v=1.0.0' index.html
           grep -q 'list-scroll-memory.js?v=1.0.0' index.html
+          grep -q 'list-reorder.js?v=1.0.0' index.html
           grep -q 'option value="weekends">Weekends</option>' index.html
-          grep -q 'const CACHE_NAME = "hana-shell-v1-list-column-scroll-1"' service-worker.js
+          grep -q 'const CACHE_NAME = "hana-shell-v1-list-reorder-1"' service-worker.js
           grep -q 'list-scroll-memory.js?v=1.0.0' service-worker.js
+          grep -q 'list-reorder.js?v=1.0.0' service-worker.js
+          grep -q 'hana-v1-2026-11-03-list-reorder' list-reorder.js
+          grep -q 'Arrange your lists by dragging' list-reorder.js
           grep -q 'hana-v1-2026-08-16-list-column-scroll' list-scroll-memory.js
           grep -q 'Lists stay where you’re working' list-scroll-memory.js
           grep -q 'function nextWeekendISO' app.js
@@ -103,7 +109,7 @@ jobs:
               app:HANA_APP_VERSION,display:HANA_DISPLAY_VERSION,release:HANA_RELEASE_NOTES.version,
               releaseKey:HANA_WHATS_NEW_KEY,storage:STORAGE_KEY,backupDb:BACKUP_DB_NAME,backupMeta:BACKUP_META_KEY,
               recovery:HanaRecoveryAudit?.status?.(),intelligence:HanaIntelligence?.status?.(),
-              listScroll:HanaListScrollMemory?.featureKey||'',
+              listScroll:HanaListScrollMemory?.featureKey||'',reorder:HanaListReorder?.featureKey||'',
               catalog:HANA_SMART_TEMPLATE_CATALOG?.length||0,profiles:Object.keys(HANA_EXPANDED_SMART_PROFILES||{}).length
             }));
             if(identity.app!=='1.0.0'||identity.display!=='1'||identity.release!=='1')throw new Error('Version identity regressed '+JSON.stringify(identity));
@@ -112,6 +118,7 @@ jobs:
             if(!identity.recovery?.hooksInstalled||!identity.recovery?.nonDestructiveAuthCleanup)throw new Error('Recovery guard regressed '+JSON.stringify(identity));
             if(!identity.intelligence?.localOnly||!identity.intelligence?.planning)throw new Error('Local intelligence missing '+JSON.stringify(identity));
             if(identity.listScroll!=='hana-v1-2026-08-16-list-column-scroll')throw new Error('List scroll guard missing '+JSON.stringify(identity));
+            if(identity.reorder!=='hana-v1-2026-11-03-list-reorder')throw new Error('List drag controller missing '+JSON.stringify(identity));
             if(identity.catalog<51||identity.profiles<27)throw new Error('Smart Template Garden regressed '+JSON.stringify(identity));
 
             const whatsNew=await page.evaluate(async()=>{
@@ -120,15 +127,16 @@ jobs:
               state.settings.lastSeenUpdateVersion='1.0.0';
               state.settings.lastSeenWhatsNewKey='hana-v1-2026-08-16-intelligence-stability';
               state.settings.lastSeenListColumnScrollKey='';
+              state.settings.lastSeenListReorderKey='';
               maybeOpenUpdateNote();
               await new Promise(r=>setTimeout(r,420));
-              const first={open:!document.getElementById('whatsNewModal').classList.contains('hidden'),title:document.getElementById('whatsNewTitle')?.textContent||'',seen:state.settings.lastSeenWhatsNewKey||'',listSeen:state.settings.lastSeenListColumnScrollKey||'',hasWeekend:HANA_RELEASE_NOTES.items.some(item=>item.title==='Weekend reminders'),hasListScroll:HANA_RELEASE_NOTES.items.some(item=>item.title==='Lists stay where you’re working')};
+              const first={open:!document.getElementById('whatsNewModal').classList.contains('hidden'),title:document.getElementById('whatsNewTitle')?.textContent||'',seen:state.settings.lastSeenWhatsNewKey||'',listSeen:state.settings.lastSeenListColumnScrollKey||'',hasWeekend:HANA_RELEASE_NOTES.items.some(item=>item.title==='Weekend reminders'),hasListScroll:HANA_RELEASE_NOTES.items.some(item=>item.title==='Lists stay where you’re working'),hasReorder:HANA_RELEASE_NOTES.items.some(item=>item.title==='Arrange your lists by dragging'),reorderSeen:state.settings.lastSeenListReorderKey||''};
               closeModal('whatsNewModal');
               maybeOpenUpdateNote();
               await new Promise(r=>setTimeout(r,420));
               return{first,noRepeat:document.getElementById('whatsNewModal').classList.contains('hidden'),version:state.settings.lastSeenUpdateVersion};
             });
-            if(!whatsNew.first.open||whatsNew.first.title!=='Hana got smarter 🌸'||whatsNew.first.seen!==identity.releaseKey||whatsNew.first.listSeen!==identity.listScroll||!whatsNew.first.hasWeekend||!whatsNew.first.hasListScroll||!whatsNew.noRepeat||whatsNew.version!=='1.0.0')throw new Error('What’s New regression '+JSON.stringify(whatsNew));
+            if(!whatsNew.first.open||whatsNew.first.title!=='Hana got smarter 🌸'||whatsNew.first.seen!==identity.releaseKey||whatsNew.first.listSeen!==identity.listScroll||!whatsNew.first.hasWeekend||!whatsNew.first.hasListScroll||!whatsNew.first.hasReorder||whatsNew.first.reorderSeen!==identity.reorder||!whatsNew.noRepeat||whatsNew.version!=='1.0.0')throw new Error('What’s New regression '+JSON.stringify(whatsNew));
 
             const recovery=await page.evaluate(async()=>{
               const space=state.spaces[0]?.id||'personal';
@@ -193,6 +201,61 @@ jobs:
             });
             if(listScroll.max<80||listScroll.before<60||Math.abs(listScroll.after-listScroll.before)>3||!listScroll.completed||listScroll.tagged!=='permanent-four-column-list'||!listScroll.noPageX)throw new Error('List column scroll regressed '+JSON.stringify(listScroll));
 
+
+            // Real pointer drag, keyboard ordering, persistence, and group safety.
+            const reorderSetup=await page.evaluate(()=>{
+              const items=[
+                {id:'drag-a',title:'Electricity',completed:false},
+                {id:'drag-b',title:'BPI',completed:false},
+                {id:'drag-c',title:'Savings',completed:false},
+                {id:'drag-d',title:'Finished',completed:true}
+              ].map(item=>({...item,lane:'both',quantity:'',detail:'',createdAt:Date.now(),updatedAt:Date.now()}));
+              state.currentPage='lists';state.activeListId='reorder-qa';
+              state.lists=[normalizeList({id:'reorder-qa',name:'Drag QA',space:'personal',columnMode:false,items})];
+              render();
+              return{handles:document.querySelectorAll('[data-list-drag-handle]').length,order:state.lists[0].items.map(x=>x.id)};
+            });
+            if(reorderSetup.handles!==4||reorderSetup.order.join(',')!=='drag-a,drag-b,drag-c,drag-d')throw new Error('List drag setup failed '+JSON.stringify(reorderSetup));
+            const grip=page.locator('[data-list-drag-handle="drag-a"]');
+            const target=page.locator('[data-list-swipe-shell="drag-c"]');
+            await grip.scrollIntoViewIfNeeded();
+            const start=await grip.boundingBox(),end=await target.boundingBox();
+            if(!start||!end)throw new Error('Drag handles missing from mobile list');
+            await page.mouse.move(start.x+start.width/2,start.y+start.height/2);
+            await page.mouse.down();
+            await page.mouse.move(end.x+end.width/2,end.y+end.height*.8,{steps:10});
+            await page.mouse.up();
+            const dragResult=await page.evaluate(()=>{
+              const current=state.lists[0].items.map(item=>item.id);
+              const stored=JSON.parse(localStorage.getItem('hana_app_v1')).lists.find(list=>list.id==='reorder-qa')?.items.map(item=>item.id);
+              return{current,stored,noPageX:document.documentElement.scrollWidth<=innerWidth+2,checked:state.lists[0].items.find(item=>item.id==='drag-d').completed};
+            });
+            if(dragResult.current.join(',')!=='drag-b,drag-c,drag-a,drag-d'||dragResult.stored?.join(',')!==dragResult.current.join(',')||!dragResult.noPageX||!dragResult.checked)throw new Error('Touch-size pointer drag or local persistence failed '+JSON.stringify(dragResult));
+            await page.locator('[data-list-drag-handle="drag-a"]').focus();
+            await page.keyboard.press('ArrowUp');
+            const keyboard=await page.evaluate(()=>({
+              order:state.lists[0].items.map(x=>x.id),
+              focused:document.activeElement?.dataset?.listDragHandle,
+              rejected:HanaListReorder.moveItem('reorder-qa','drag-a','drag-d',true)
+            }));
+            if(keyboard.order.join(',')!=='drag-b,drag-a,drag-c,drag-d'||keyboard.focused!=='drag-a'||keyboard.rejected!==false)throw new Error('Keyboard or completed-group safety failed '+JSON.stringify(keyboard));
+            const columnReorder=await page.evaluate(async()=>{
+              const now=Date.now(),item=(id,lane)=>({id,title:id,lane,completed:false,quantity:'',detail:'',createdAt:now,updatedAt:now});
+              const list=normalizeList({id:'reorder-columns',name:'Column drag QA',space:'personal',columnMode:true,columnCount:4,
+                columnLabels:{partner:'Cha',me:'Martin',both:'Both',column4:'Supermart'},
+                items:[item('col-a','column4'),item('col-b','column4'),item('col-c','partner')]});
+              state.lists=[list];state.activeListId=list.id;render();
+              const board=document.querySelector('.list-column-board'),max=board.scrollWidth-board.clientWidth;
+              board.scrollLeft=max;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+              const before=board.scrollLeft;
+              const blocked=HanaListReorder.moveItem(list.id,'col-a','col-c',true);
+              const moved=HanaListReorder.moveItem(list.id,'col-a','col-b',false);
+              await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+              return{blocked,moved,order:list.items.map(x=>x.id),before,after:document.querySelector('.list-column-board')?.scrollLeft||0,
+                noPageX:document.documentElement.scrollWidth<=innerWidth+2};
+            });
+            if(columnReorder.blocked!==false||columnReorder.moved!==true||columnReorder.order.join(',')!=='col-b,col-a,col-c'||Math.abs(columnReorder.before-columnReorder.after)>3||!columnReorder.noPageX)throw new Error('Column reorder/scroll preservation regressed '+JSON.stringify(columnReorder));
+
             const intelligence=await page.evaluate(()=>{
               const space=state.spaces[0]?.id||'personal';
               state.tasks=[{id:'ai-a',title:'Submit visa application',notes:'after passport photo',space,dueDate:todayISO(),done:false,estimatedMinutes:60,createdAt:Date.now(),updatedAt:Date.now()},{id:'ai-b',title:'Get passport photo',space,done:false,estimatedMinutes:15,createdAt:Date.now(),updatedAt:Date.now()},{id:'ai-c',title:'Write Japan itinerary',space,done:false,estimatedMinutes:30,createdAt:Date.now(),updatedAt:Date.now()},{id:'ai-d',title:'Review Japan food list',space,done:false,estimatedMinutes:20,createdAt:Date.now(),updatedAt:Date.now()},{id:'ai-e',title:'Book Japan hotel',space,done:false,estimatedMinutes:20,createdAt:Date.now(),updatedAt:Date.now()}];
@@ -216,7 +279,7 @@ jobs:
             if(longSkincare.count!==8||longSkincare.font>12||longSkincare.font<10.5||longSkincare.row>45||!longSkincare.noScroll||!longSkincare.noX)throw new Error('Adaptive skincare regressed '+JSON.stringify(longSkincare));
 
             if(errors.length)throw new Error('Browser runtime errors: '+errors.join(' | '));
-            console.log('Hana Version 1 permanent QA passed',JSON.stringify({identity,whatsNew,recovery,retained,weekendReminder,listScroll,intelligence,smart,packing,skincare,longSkincare}));
+            console.log('Hana Version 1 permanent QA passed',JSON.stringify({identity,whatsNew,recovery,retained,weekendReminder,listScroll,reorderSetup,dragResult,keyboard,columnReorder,intelligence,smart,packing,skincare,longSkincare}));
             await browser.close();
           })().catch(e=>{console.error(e);process.exit(1)});
           NODE
