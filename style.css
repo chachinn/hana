@@ -5195,3 +5195,69 @@ body.modal-open{overflow:hidden}
 #skincareViewMode .skincare-view-step-list:has(.skincare-view-step:nth-child(10)) .skincare-view-step { min-height: 31px; padding-block: 2px; }
 #skincareViewMode .skincare-view-step-list:has(.skincare-view-step:nth-child(10)) .skincare-view-step strong { font-size: 10.5px; line-height: 1.05; }
 #skincareViewMode .skincare-view-step-list:has(.skincare-view-step:nth-child(10)) .skincare-category-pill { font-size: 6.5px; }
+
+/* Hana Version 1 · dedicated list drag handle; existing checkbox, edit and swipe stay independent. */
+.list-swipe-shell .standalone-check-item {
+  grid-template-columns:auto minmax(0,1fr) 34px auto;
+}
+.list-drag-handle {
+  display:grid;
+  place-items:center;
+  width:34px;
+  min-width:34px;
+  min-height:40px;
+  padding:0;
+  border:1px solid var(--border-soft);
+  border-radius:11px;
+  background:var(--pink-50);
+  color:var(--rose);
+  font-size:22px;
+  font-weight:850;
+  line-height:1;
+  cursor:grab;
+  touch-action:none;
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-tap-highlight-color:transparent;
+}
+.list-drag-handle:focus-visible {outline:2px solid var(--pink-500);outline-offset:2px}
+.list-column-item-shell .standalone-check-item {
+  grid-template-columns:auto minmax(0,1fr) 26px;
+}
+.list-column-item-shell .list-drag-handle {
+  width:26px;
+  min-width:26px;
+  min-height:34px;
+  font-size:18px;
+  border-radius:8px;
+}
+.list-swipe-shell.list-reorder-active {
+  z-index:20;
+  overflow:visible;
+  box-shadow:0 10px 22px rgba(168,70,108,.16);
+}
+.list-reorder-active .list-drag-handle {cursor:grabbing}
+.list-swipe-shell.list-reorder-before::before,
+.list-swipe-shell.list-reorder-after::after {
+  content:"";
+  position:absolute;
+  left:4px;
+  right:4px;
+  height:4px;
+  border-radius:99px;
+  background:var(--pink-500);
+  z-index:21;
+  pointer-events:none;
+}
+.list-swipe-shell.list-reorder-before::before {top:0}
+.list-swipe-shell.list-reorder-after::after {bottom:0}
+body.list-reordering {-webkit-user-select:none;user-select:none}
+@media(max-width:420px){
+  .list-swipe-shell:not(.list-column-item-shell) .standalone-check-item {
+    grid-template-columns:auto minmax(0,1fr) 30px auto;
+    gap:7px;
+  }
+  .list-swipe-shell:not(.list-column-item-shell) .list-drag-handle {
+    min-width:30px;width:30px;
+  }
+}
